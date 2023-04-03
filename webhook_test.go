@@ -3,13 +3,12 @@ package webhook
 import (
 	"fmt"
 	"testing"
-
-	"github.com/k0kubun/pp/v3"
 )
 
 func TestWebhook(t *testing.T) {
+	var rest interface{}
 	webhook := DefaultWebhook()
-	pp.Println(webhook)
+
 	res, err := webhook.
 		SetUrl("https://api.gotipath.test/v1/webhook").
 		SetDebug(true).
@@ -18,7 +17,10 @@ func TestWebhook(t *testing.T) {
 		Dispatch()
 
 	if err != nil {
-		pp.Println(err)
+		return
+	}
+
+	if err := res.Unmarshal(&rest); err != nil {
 		return
 	}
 
