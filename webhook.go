@@ -113,6 +113,7 @@ func (receiver *Webhook) SetUrl(url string) *Webhook {
 	receiver.url = url
 	return receiver
 }
+
 func (receiver *Webhook) Payload(payload interface{}) *Webhook {
 	if payload == nil {
 		receiver.err = ErrPayloadNotSet
