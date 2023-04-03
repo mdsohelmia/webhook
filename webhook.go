@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
+
 	"net/http"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 var (
 	ErrWebhookUrlNotSet = errors.New("could not call the webhook because the URL has not been set")
 	ErrSecretNotSet     = errors.New("could not call the webhook because no secret has been set")
+	ErrPayloadNotSet    = errors.New("could not call the webhook because no payload has been set")
+	ErrPayloadNotJson   = errors.New("could not call the webhook because the payload is not a valid JSON")
 )
 
 type HttpMethod string
@@ -30,10 +34,17 @@ type Config struct {
 	// Maximum time to wait
 	RetryWaitMax time.Duration
 	// Maximum number of retries
-	RetryMax            int
+	RetryMax int
+	//Signer signer.Signer
 	Signer              signer.Signer
 	SignWebhook         bool
 	SignatureHeaderName string
+	// Timeout for the request
+	Timeout time.Duration
+	//Debug bool
+	//Default false
+	Debug bool
+	Url   string
 }
 type Webhook struct {
 	client     *http.Client
@@ -47,7 +58,7 @@ type Webhook struct {
 	httpMethod HttpMethod
 }
 
-func NewWithConfig(config *Config) *Webhook {
+func NewWebhook(config *Config) *Webhook {
 	webhook := &Webhook{
 		config:     config,
 		signer:     config.Signer,
@@ -57,15 +68,25 @@ func NewWithConfig(config *Config) *Webhook {
 	return webhook
 }
 
-func New() *Webhook {
+//DefaultWebhook returns a new webhook with default configuration
+//Default http method is POST
+//Default signer is DefaultSigner
+//Default retry wait min is 1 second
+// Default retry wait max is 30 second
+// Default retry max is 10
+// Default timeout is 30 second
+
+func DefaultWebhook() *Webhook {
 	webhook := &Webhook{
 		httpMethod: MethodPost,
 		signer:     signer.NewDefaultSigner(),
 		config: &Config{
 			RetryWaitMin: 1 * time.Second,
 			RetryWaitMax: 30 * time.Second,
-			RetryMax:     3,
-			SignWebhook:  true,
+			Timeout:      30 * time.Second,
+			RetryMax:     10,
+			SignWebhook:  false,
+			Debug:        false,
 		},
 	}
 	webhook.client = webhook.newClient()
@@ -79,16 +100,26 @@ func (receiver *Webhook) newClient() *http.Client {
 	retryableClient.RetryWaitMin = receiver.config.RetryWaitMin
 	retryableClient.RetryWaitMax = receiver.config.RetryWaitMax
 	retryableClient.RetryMax = receiver.config.RetryMax
+	retryableClient.HTTPClient.Timeout = receiver.config.Timeout
 
+	if !receiver.config.Debug {
+		retryableClient.Logger = nil
+	}
+	// Return the underlying http.Client
 	return retryableClient.StandardClient()
 }
 
-func (receiver *Webhook) Url(url string) *Webhook {
+func (receiver *Webhook) SetUrl(url string) *Webhook {
 	receiver.url = url
 	return receiver
 }
 func (receiver *Webhook) Payload(payload interface{}) *Webhook {
+	if payload == nil {
+		receiver.err = ErrPayloadNotSet
+		return receiver
+	}
 	payloadBytes, err := json.Marshal(payload)
+
 	if err != nil {
 		receiver.err = err
 		return receiver
@@ -152,7 +183,7 @@ func (receiver *Webhook) Dispatch() (*Response, error) {
 		return nil, receiver.err
 	}
 
-	if err := receiver.prepareForDispatch(); err != nil {
+	if err := receiver.prepareRequest(); err != nil {
 		return nil, err
 	}
 
@@ -168,18 +199,31 @@ func (receiver *Webhook) Dispatch() (*Response, error) {
 		return nil, err
 	}
 
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &Response{
 		response: response,
+		body:     body,
 	}, nil
 }
 
-func (receiver *Webhook) prepareForDispatch() error {
+func (receiver *Webhook) prepareRequest() error {
 	if receiver.url == "" {
 		return ErrWebhookUrlNotSet
 	}
 
 	if receiver.config.SignWebhook && receiver.secret == "" {
 		return ErrSecretNotSet
+	}
+
+	if receiver.payload == nil {
+		return ErrPayloadNotSet
 	}
 
 	return nil
@@ -193,4 +237,9 @@ func (receiver *Webhook) makeRequest() (*http.Request, error) {
 		request.Header.Set(key, value)
 	}
 	return request, nil
+}
+
+func (receiver *Webhook) SetDebug(debug bool) *Webhook {
+	receiver.config.Debug = debug
+	return receiver
 }

@@ -4,36 +4,33 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/k0kubun/pp"
+	"github.com/k0kubun/pp/v3"
 )
 
-func TestWebhookTest(t *testing.T) {
-
-	res, err := New().
-		Url("https://api.gotipath.test/v1/webhook").
-		UseHttpVerb(MethodPut).
-		Payload(map[string]string{
-			"id":      "100",
-			"event":   "customer.created",
-			"event1":  "customer.created",
-			"event2":  "customer.created",
-			"event3":  "customer.created",
-			"event4":  "customer.created",
-			"event5":  "customer.created",
-			"event6":  "customer.created",
-			"event7":  "customer.created",
-			"event8":  "customer.created",
-			"event9":  "customer.created",
-			"event10": "customer.created",
-		}).
-		UseSignatureHeaderName("X-Gotipath-Signature").
-		UseSecret("2Y4Zeqi2foh70p8xiDbpDjGP8kjttCmmSIXLi7EUVeREwapHaZH1gSDuQLicbyzbOUP2kwidQlhZ40moXTY2mB9iKYtkRfjrWsL5h8RQUMs4eQjK2sL97QsXKtw6Qexogtl5cVVeVyElk1JgxjalI0gUWkivjHXl1haxdkHoTCFkuH3J2sRlRGDSlhYEkETeC7eU3TOxSAtwY1vlm2AvlyaUy8rlCoccO0tZOKiOoHWWkx6UTIzSIKIgX86hV4WCUKyKUmvGGhuKL9ci3puLtLhzS1sEbC5RpsShYBPXYHGBL2BGD38BpzABve1r1Kg8k8AdGSfJ3yBSGGo4Crj0HGyF1OX6ij00K4qtzID8A1iOisklgI3IwdPt4yplCF3HCDJOrxAQexKj3kJZJ1x54JA4MU5hI75A6zIpCskp0oraKsg70BOxZ8wh").
+func TestWebhook(t *testing.T) {
+	webhook := DefaultWebhook()
+	pp.Println(webhook)
+	res, err := webhook.
+		SetUrl("https://api.gotipath.test/v1/webhook").
+		SetDebug(true).
+		Payload("hello playlod").
+		UseHttpVerb(MethodPost).
 		Dispatch()
 
 	if err != nil {
-		pp.Println(err.Error())
+		pp.Println(err)
+		return
 	}
 
-	fmt.Println(res.response.Status)
+	fmt.Println("status:", res.Status())
 
 }
+
+// 240p=  181 kb/s = 25 fps
+// 360p = 370 kb/s = 25 fps
+// 480p = 1000 kb/s = 25 fps
+// 540p.mp4 = 719 kb/s = 25 fps
+// 720p =  1033 kb/s = 25 fps
+// 1080p = 2133 kb/s = 25 fps
+// 1440p = 6000 kb/s = 25 fps
+// 2160p = 10000 kb/s = 25 fps
